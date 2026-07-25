@@ -1,5 +1,7 @@
 # CreditCEP AI 🌾🤖
 
+![CI](https://github.com/Louistatch/Botfinance/actions/workflows/ci.yml/badge.svg)
+
 **Système intelligent d'analyse et d'octroi de crédit agricole pour coopératives, via WhatsApp.**
 
 CreditCEP AI permet à une coopérative agricole de déposer une demande de crédit
@@ -142,6 +144,7 @@ Documentation interactive complète : **`/api/docs`** (Swagger).
 | GET     | `/dashboard/export/pdf`                 | Export PDF                           |
 | GET     | `/whatsapp/qr`                          | QR Code de connexion                 |
 | GET     | `/whatsapp/status`                      | État de la session bot               |
+| GET     | `/health`                               | Sonde de santé (liveness + base)     |
 
 ---
 

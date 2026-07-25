@@ -212,13 +212,22 @@ export default function DashboardPage() {
                       </td>
                       <td>{decisionBadge(r.evaluation?.decision ?? null)}</td>
                       <td>
-                        <button
-                          className="btn secondary"
-                          style={{ padding: '6px 12px', fontSize: 13 }}
-                          onClick={() => evaluate(r.id)}
-                        >
-                          {r.evaluation ? 'Réévaluer' : 'Évaluer'}
-                        </button>
+                        <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                          <a
+                            className="btn secondary"
+                            style={{ padding: '6px 12px', fontSize: 13 }}
+                            href={`/dashboard/requests/${r.id}`}
+                          >
+                            Détails
+                          </a>
+                          <button
+                            className="btn secondary"
+                            style={{ padding: '6px 12px', fontSize: 13 }}
+                            onClick={() => evaluate(r.id)}
+                          >
+                            {r.evaluation ? 'Réévaluer' : 'Évaluer'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

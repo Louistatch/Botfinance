@@ -10,6 +10,7 @@ import { CreditRequestsModule } from './modules/credit-requests/credit-requests.
 import { ScoringModule } from './modules/scoring/scoring.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
+import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -26,6 +27,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     CreditRequestsModule,
     DashboardModule,
     WhatsappModule,
+    HealthModule,
   ],
   providers: [
     // Garde JWT appliquée globalement (les routes @Public() sont exemptées).
