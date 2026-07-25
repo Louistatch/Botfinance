@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Builds
+dist/
+build/
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Prisma
+backend/prisma/migrations/dev.db*
+
+# WhatsApp / Baileys auth session
+backend/.baileys_auth/
+.baileys_auth/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Test / coverage
+coverage/
+*.lcov
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Exports générés
+backend/exports/

@@ -1,0 +1,324 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  CreditCEP AI — Schéma de base de données (Prisma / PostgreSQL)
+//
+//  Modèle métier dérivé directement des documents officiels :
+//   • Excel « CEP_KARA »  -> identité & bureau de la coopérative
+//   • PDF « Gestion des CEP » (ProSMAT) -> gouvernance, épargne, crédit, risque
+//   • TDR « ProSMAT » -> diversification (Markowitz), VaR, passeport de risque
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── ENUMS ───────────────────────────
+
+/// Rôles applicatifs (authentification JWT).
+enum Role {
+  ADMIN
+  CREDIT_ANALYST
+  AGENT
+}
+
+/// Type de financement (cf. PDF Modules 4 & 5).
+/// INTERNAL_FUND : fond interne CEP — année 1, ≤ 100 000 FCFA, ≤ 3 mois, 5%.
+/// EXTERNAL_WAGES : emprunt IMF partenaire WAGES — ≤ 1 000 000 FCFA, 9% dégressif.
+enum CreditType {
+  INTERNAL_FUND
+  EXTERNAL_WAGES
+}
+
+/// Type d'irrigation (résilience climatique, cf. maraîchage agro-écologique).
+enum IrrigationType {
+  NONE
+  MANUAL
+  GRAVITY
+  MOTOR_PUMP
+  CALIFORNIAN
+  DRIP
+}
+
+/// Stabilité de l'historique climatique de la zone.
+enum ClimateHistory {
+  STABLE
+  MODERATE
+  UNSTABLE
+  SEVERE
+}
+
+/// Antécédents de remboursement de la coopérative.
+enum RepaymentHistory {
+  EXCELLENT
+  GOOD
+  AVERAGE
+  POOR
+  NONE // Première demande — pas d'historique.
+}
+
+/// Cycle de vie d'une demande de crédit.
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  EVALUATED
+  APPROVED
+  CONDITIONAL
+  REJECTED
+}
+
+/// Canal d'origine de la demande.
+enum RequestSource {
+  WHATSAPP
+  DASHBOARD
+  API
+}
+
+/// Niveau de risque (Passeport de Risque — TDR).
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+}
+
+/// Décision finale du moteur.
+enum Decision {
+  ELIGIBLE
+  CONDITIONAL
+  REJECTED
+}
+
+/// Besoin en eau d'une culture (donnée agronomique de référence).
+enum WaterNeed {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// ─────────────────────────── UTILISATEURS ───────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  role         Role     @default(AGENT)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  evaluations Evaluation[] @relation("EvaluatedBy")
+
+  @@map("users")
+}
+
+// ─────────────────────────── COOPÉRATIVES (CEP) ───────────────────────────
+
+model Cooperative {
+  id      String @id @default(uuid())
+  code    String @unique // Référence interne auto (ex: COOP-2026-0001)
+  name    String // Nom de la coopérative
+  cepName String? // Nom de la CEP mise en place
+
+  // Localisation (structure Excel CEP_KARA)
+  region     String
+  prefecture String
+  commune    String?
+  village    String?
+
+  // Membres & bureau (Comité de gestion — PDF Module 3)
+  memberCount        Int
+  presidentName      String
+  presidentPhone     String
+  vicePresidentName  String?
+  vicePresidentPhone String?
+  secretaryName      String?
+  secretaryPhone     String?
+  treasurerName      String?
+  treasurerPhone     String?
+  treasurerDeputy    String?
+  contactPhone       String // Numéro WhatsApp principal
+
+  // Ancienneté
+  creationYear   Int?
+  seniorityYears Int @default(0)
+
+  // Gouvernance (règles PDF Module 3 & « erreurs fréquentes » p.9)
+  separationOfPowers Boolean @default(false) // Pas de cumul de fonctions
+  agHeldRegularly    Boolean @default(false) // AG tenue au moins 1x/an
+  keepsMinutes       Boolean @default(false) // Procès-verbaux signés
+  keepsRegisters     Boolean @default(false) // Registres obligatoires tenus
+
+  // Renforcement de capacités
+  participatesInCEP Boolean @default(true) // Membre d'une CEP ProSMAT
+  trained           Boolean @default(false) // Formation gestion suivie
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creditRequests CreditRequest[]
+  conversations  WhatsappConversation[]
+
+  @@index([region, prefecture])
+  @@map("cooperatives")
+}
+
+// ─────────────────────────── DEMANDES DE CRÉDIT ───────────────────────────
+
+model CreditRequest {
+  id            String @id @default(uuid())
+  reference     String @unique // ex: DEM-2026-000123
+  cooperativeId String
+  cooperative   Cooperative @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+
+  // Objet du crédit
+  creditType     CreditType @default(INTERNAL_FUND)
+  requestedAmount Float // FCFA
+  purpose        String // Objet du crédit
+  proposedDuration Int? // mois
+  proposedDeferral Int? // mois de différé
+
+  // Volet agricole (maraîchage agro-écologique)
+  cultures      String[] // ex: ["tomate", "piment", "oignon"]
+  totalArea     Float? // superficie totale (ha)
+  yields        Json? // rendements par culture kg/ha : { "tomate": 12000 }
+  waterAccess   Boolean @default(false)
+  irrigationType IrrigationType @default(NONE)
+  climateHistory ClimateHistory @default(MODERATE)
+  hasEquipment  Boolean @default(false)
+  equipmentList String?
+  laborForce    Int? // nombre de personnes / main d'œuvre
+
+  // Volet financier
+  revenue                 Float? // chiffre d'affaires annuel (FCFA)
+  charges                 Float? // charges annuelles (FCFA)
+  savings                 Float @default(0) // épargne cumulée (FCFA)
+  memberContribution      Float @default(0) // cotisation par membre (FCFA)
+  mandatorySavingsUpToDate Boolean @default(false) // épargne obligatoire à jour
+  liquidityReserveRatio   Float? // part des ressources gardée en liquide (0-1)
+
+  // Garanties
+  guaranteesDescription String?
+  guaranteeValue        Float? // valeur estimée des garanties (FCFA)
+
+  // Historique de remboursement / risque de portefeuille
+  repaymentHistory RepaymentHistory @default(NONE)
+  par30            Float? // Portfolio At Risk 30 jours (0-1)
+  previousDefaults Int    @default(0)
+
+  // Métadonnées workflow
+  status           RequestStatus @default(DRAFT)
+  source           RequestSource @default(WHATSAPP)
+  submittedByPhone String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  evaluation Evaluation?
+
+  @@index([status])
+  @@index([cooperativeId])
+  @@map("credit_requests")
+}
+
+// ─────────────────────────── ÉVALUATIONS (MOTEUR IA) ───────────────────────────
+
+model Evaluation {
+  id              String @id @default(uuid())
+  creditRequestId String @unique
+  creditRequest   CreditRequest @relation(fields: [creditRequestId], references: [id], onDelete: Cascade)
+
+  // Les 11 scores métier (0-100)
+  scoreFinancier    Float
+  scoreAgricole     Float
+  scoreGouvernance  Float
+  scoreHistorique   Float
+  scoreClimat       Float
+  scoreRemboursement Float
+  scoreProduction   Float
+  scoreTresorerie   Float
+  scoreRentabilite  Float
+  scoreRisque       Float
+  globalScore       Float // /100
+
+  // Décision
+  riskLevel     RiskLevel
+  decision      Decision
+  justification String // texte de synthèse
+
+  // Détail (contributions par dimension)
+  breakdown Json // [{ key, label, score, weight, weightedScore, comment }]
+  flags     Json // règles bloquantes / alertes déclenchées
+
+  // Recommandations
+  recommendedAmount        Float
+  recommendedDuration      Int
+  recommendedDeferral      Int
+  recommendedRate          Float // taux annuel conseillé (%)
+  additionalGuarantees     Json // string[]
+  favoredCultures          Json // string[]
+  riskyCultures            Json // string[]
+  technicalRecommendations Json // string[]
+  financialRecommendations Json // string[]
+  conditions               Json // string[] (décision sous conditions)
+
+  // Indicateurs quantitatifs (TDR : Markowitz / VaR / Sharpe)
+  var95              Float? // Value at Risk 95% (FCFA)
+  expectedShortfall  Float? // Expected Shortfall / CVaR (FCFA)
+  sharpeRatio        Float?
+  diversificationIndex Float? // 0-1
+
+  engineVersion String @default("1.0.0")
+
+  evaluatedById String?
+  evaluatedBy   User?   @relation("EvaluatedBy", fields: [evaluatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([decision])
+  @@index([riskLevel])
+  @@map("evaluations")
+}
+
+// ─────────────────────────── CONVERSATIONS WHATSAPP ───────────────────────────
+
+model WhatsappConversation {
+  id            String  @id @default(uuid())
+  phone         String  @unique // numéro E.164 sans le suffixe @s.whatsapp.net
+  state         String  @default("START") // clé de l'étape courante
+  data          Json    @default("{}") // accumulateur des réponses
+  completed     Boolean @default(false)
+  cooperativeId String?
+  cooperative   Cooperative? @relation(fields: [cooperativeId], references: [id], onDelete: SetNull)
+  lastRequestId String?
+
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("whatsapp_conversations")
+}
+
+// ─────────────────────────── RÉFÉRENTIEL AGRONOMIQUE ───────────────────────────
+
+/// Données de référence par culture maraîchère (alimente les recommandations,
+/// l'évaluation des rendements et le calcul de risque / diversification — TDR).
+model CultureReference {
+  id          String    @id @default(uuid())
+  name        String    @unique // ex: "tomate"
+  region      String? // référence régionale éventuelle
+  avgYield    Float // rendement moyen de référence (kg/ha)
+  price       Float // prix moyen (FCFA/kg)
+  volatility  Float // volatilité du revenu (0-1) — pour VaR / risque
+  cycleMonths Int // durée du cycle cultural (mois)
+  waterNeed   WaterNeed @default(MEDIUM)
+  agroEco     Boolean   @default(true) // adaptée à l'agro-écologie
+  createdAt   DateTime  @default(now())
+
+  @@map("culture_references")
+}
