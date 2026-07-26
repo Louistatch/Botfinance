@@ -6,7 +6,7 @@ WORKDIR /app
 #  - git : Baileys tire `libsignal` depuis un dépôt git
 #  - python3/make/g++ : compilation native de libsignal (node-gyp)
 # On force git à utiliser HTTPS au lieu de SSH (pas de clé SSH en conteneur).
-RUN apk add --no-cache git python3 make g++ \
+RUN apk add --no-cache git python3 make g++ openssl libc6-compat \
     && git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" \
     && git config --global url."https://github.com/".insteadOf "git@github.com:"
 
@@ -28,7 +28,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Mêmes outils : l'install de prod recompile aussi libsignal (dép. de Baileys).
-RUN apk add --no-cache git python3 make g++ \
+RUN apk add --no-cache git python3 make g++ openssl libc6-compat \
     && git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" \
     && git config --global url."https://github.com/".insteadOf "git@github.com:"
 
