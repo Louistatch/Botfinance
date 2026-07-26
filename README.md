@@ -90,6 +90,14 @@ re-scanner à chaque redémarrage.
 
 ---
 
+## ☁️ Déploiement en ligne (bot WhatsApp 24/7)
+
+Pour mettre le bot en ligne avec un **numéro WhatsApp qui répond en continu**,
+suivez le guide pas-à-pas **[DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md)** (déploiement
+managé sur Railway : PostgreSQL + backend/bot + dashboard, ~15 min). Les fichiers
+`backend/railway.json` et `dashboard/railway.json` rendent le déploiement clé en
+main ; la session WhatsApp est persistée sur un volume.
+
 ## 🧑‍💻 Développement local (sans Docker)
 
 ```bash

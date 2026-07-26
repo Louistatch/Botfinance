@@ -46,8 +46,9 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
 
-  const port = parseInt(process.env.BACKEND_PORT ?? '3001', 10);
-  await app.listen(port);
+  // Railway/Heroku fournissent le port via PORT ; on écoute sur 0.0.0.0.
+  const port = parseInt(process.env.PORT ?? process.env.BACKEND_PORT ?? '3001', 10);
+  await app.listen(port, '0.0.0.0');
 
   logger.log(`🚀 CreditCEP AI backend prêt sur http://localhost:${port}/${apiPrefix}`);
   logger.log(`📚 Swagger : http://localhost:${port}/${apiPrefix}/docs`);

@@ -27,7 +27,7 @@ export interface AppConfig {
 
 export default (): AppConfig => ({
   env: process.env.NODE_ENV ?? 'development',
-  port: parseInt(process.env.BACKEND_PORT ?? '3001', 10),
+  port: parseInt(process.env.PORT ?? process.env.BACKEND_PORT ?? '3001', 10),
   apiPrefix: process.env.API_PREFIX ?? 'api',
   jwt: {
     secret: process.env.JWT_SECRET ?? 'dev_insecure_secret',
