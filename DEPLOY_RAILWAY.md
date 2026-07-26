@@ -148,3 +148,5 @@ via l'API.
   redéploiement.
 - Coûts : Railway offre un crédit gratuit mensuel, suffisant pour un prototype ;
   au-delà, la facturation est à l'usage.
+
+<!-- redeploy 2026-07-26T06:23Z : force Railway à reconstruire depuis le HEAD corrigé (next 14.2.35) -->
