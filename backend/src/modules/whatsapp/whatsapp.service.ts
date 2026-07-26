@@ -9,7 +9,12 @@ import * as QRCode from 'qrcode';
 import { Decision, RequestSource, RiskLevel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreditRequestsService } from '../credit-requests/credit-requests.service';
-import { CONVERSATION_FLOW, nextQuestion, Question } from './whatsapp.flow';
+import {
+  CONVERSATION_FLOW,
+  nextQuestion,
+  Question,
+  FORMATION_MODULES,
+} from './whatsapp.flow';
 import { CREDIT_RULES } from '../scoring/scoring.rules';
 
 /**
@@ -188,6 +193,11 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       return this.handleMenuChoice(phone, lower);
     }
 
+    // ── Espace formation : choix d'un thème ──
+    if (convo.state === 'FORMATION') {
+      return this.handleFormationChoice(phone, lower);
+    }
+
     // ── Consultation d'une demande existante ──
     if (convo.state === 'AWAIT_REFERENCE') {
       return this.lookupRequest(phone, text.trim());
@@ -251,9 +261,32 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       case 'conseiller':
       case 'contact':
         return this.contact() + '\n\n' + this.backHint();
+      case '5':
+      case 'formation':
+        await this.setState(phone, 'FORMATION', {});
+        return this.formationMenu();
       default:
         return 'Choix non reconnu. Merci de répondre par un numéro.\n\n' + this.menu();
     }
+  }
+
+  /** Sous-menu de formation à la gestion et à la gouvernance de la CEP. */
+  private handleFormationChoice(phone: string, choice: string): string {
+    if (['0', 'retour', 'menu principal'].includes(choice)) {
+      // Le retour au menu principal passe par la commande globale MENU ;
+      // ici on réaffiche simplement le menu de formation par défaut.
+      return this.formationMenu();
+    }
+    const n = parseInt(choice, 10);
+    if (!Number.isNaN(n) && n >= 1 && n <= FORMATION_MODULES.length) {
+      return (
+        FORMATION_MODULES[n - 1].content +
+        '\n\n' +
+        'Répondez par un autre numéro pour un nouveau thème, ou MENU pour le ' +
+        'menu principal.'
+      );
+    }
+    return 'Choix non reconnu.\n\n' + this.formationMenu();
   }
 
   /** Recherche et restitue le statut d'une demande à partir de sa référence. */
@@ -353,8 +386,23 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       '1. Faire une demande de crédit\n' +
       '2. Consulter une demande existante\n' +
       '3. Conditions et plafonds de crédit\n' +
-      '4. Contacter un conseiller\n\n' +
+      '4. Contacter un conseiller\n' +
+      '5. Formation — gestion et gouvernance de la CEP\n\n' +
       'À tout moment, répondez MENU pour revenir ici.'
+    );
+  }
+
+  /** Sous-menu des thèmes de formation. */
+  private formationMenu(): string {
+    const items = FORMATION_MODULES.map(
+      (m, i) => `${i + 1}. ${m.title}`,
+    ).join('\n');
+    return (
+      '*Formation — gestion et gouvernance de la CEP*\n\n' +
+      'Les membres se forment régulièrement au fonctionnement de leur caisse. ' +
+      'Choisissez un thème :\n' +
+      items +
+      '\n\nRépondez par un numéro, ou MENU pour revenir au menu principal.'
     );
   }
 

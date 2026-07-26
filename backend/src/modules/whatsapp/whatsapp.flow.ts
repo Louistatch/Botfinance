@@ -143,3 +143,114 @@ export function nextQuestion(data: Record<string, any>): Question | null {
   }
   return null;
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────
+ *  MODULES DE FORMATION — gestion & gouvernance des CEP
+ * ─────────────────────────────────────────────────────────────────────────
+ *  Contenu de sensibilisation destiné aux membres (les femmes se forment
+ *  régulièrement au fonctionnement de leur caisse). Fidèle au Règlement de
+ *  fonctionnement de la CEP et au manuel de gestion ProSMAT / CTOP.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+export interface FormationModule {
+  title: string;
+  content: string;
+}
+
+export const FORMATION_MODULES: FormationModule[] = [
+  {
+    title: 'Les organes de la CEP',
+    content:
+      '*Les organes de la CEP*\n\n' +
+      'La Caisse Endogène Paysanne est structurée en deux organes.\n\n' +
+      '*Assemblée Générale (AG)* — tous les membres, présidée par la ' +
+      'Présidente. Elle :\n' +
+      '- élabore et approuve le règlement de fonctionnement ;\n' +
+      '- élit les membres du Comité de gestion ;\n' +
+      '- définit les orientations (cotisations, crédit) ;\n' +
+      '- valide le rapport d’activités et les comptes ;\n' +
+      '- décide des admissions, suspensions et radiations.\n\n' +
+      '*Comité de gestion* — cinq membres (Présidente, Vice-présidente, ' +
+      'Secrétaire, Trésorière, Trésorière-adjointe), assistés de trois ' +
+      'détentrices de clés et deux compteuses. Mandat d’un à trois ans, ' +
+      'renouvelable une fois. Il assure la gestion hebdomadaire et l’étude ' +
+      'préalable des demandes de crédit.',
+  },
+  {
+    title: 'Le bureau et ses rôles',
+    content:
+      '*Le bureau et ses rôles*\n\n' +
+      '*Présidente* : représente la CEP, dirige les réunions et le comité ' +
+      'd’étude, signe les documents, supervise les activités.\n' +
+      '*Vice-présidente* : remplace la Présidente en son absence.\n' +
+      '*Secrétaire* : correspondance, procès-verbaux, registre des membres, ' +
+      'analyse des dossiers de crédit.\n' +
+      '*Trésorière* : tient le journal des mouvements de fonds, suit les ' +
+      'comptes, présente le bilan, vérifie la caissette en fin de réunion.\n' +
+      '*Trésorière-adjointe* : garde la caissette, tamponne les livrets, ' +
+      'remplace la Trésorière.\n' +
+      '*Compteuses (2)* : comptent l’argent collecté ou remis en réunion.\n' +
+      '*Détentrices de clés (3)* : chacune garde une clé ; la caissette ne ' +
+      's’ouvre qu’avec les trois clés réunies.',
+  },
+  {
+    title: 'Adhésion, cotisations et épargne',
+    content:
+      '*Adhésion, cotisations et épargne*\n\n' +
+      'L’adhésion est volontaire ; un groupe compte de 15 à 25 membres ' +
+      'partageant des objectifs communs.\n\n' +
+      '- *Droit d’adhésion* : fixé par l’AG, non remboursable.\n' +
+      '- *Cotisation obligatoire* : versement périodique fixe (hebdomadaire), ' +
+      'condition d’accès au crédit.\n' +
+      '- *Cotisation volontaire* : dépôt libre, dans une fourchette définie.\n\n' +
+      'Les cotisations constituent le fonds commun qui finance les prêts et ' +
+      'les projets de la communauté. En fin de cycle, cotisations et intérêts ' +
+      'sont partagés au prorata des contributions de chaque membre.',
+  },
+  {
+    title: 'Le crédit',
+    content:
+      '*Le crédit*\n\n' +
+      'Le crédit soutient le maraîchage agro-écologique (production, ' +
+      'transformation, commercialisation), le commerce, l’artisanat et les ' +
+      'services : semences, intrants, main-d’œuvre, petit matériel.\n\n' +
+      '*Analyse du dossier* : moralité, rentabilité de l’activité, ' +
+      'solvabilité et capacité de remboursement. La demande passe par la ' +
+      'Secrétaire, est évaluée par le Comité de gestion, puis décidée en AG.\n\n' +
+      '*Modalités (première année)* :\n' +
+      '- plafond : 3 fois la cotisation, sans dépasser 100 000 FCFA ;\n' +
+      '- durée maximale : 3 mois ;\n' +
+      '- pénalité en cas de retard ;\n' +
+      '- remboursement en fin de période ou étalé selon les revenus.',
+  },
+  {
+    title: 'Gouvernance et bonnes pratiques',
+    content:
+      '*Gouvernance et bonnes pratiques*\n\n' +
+      'Une bonne gouvernance protège la caisse et la confiance des membres :\n\n' +
+      '- *Séparation des pouvoirs* : un même membre ne cumule pas deux ' +
+      'fonctions incompatibles.\n' +
+      '- *Assemblée Générale régulière* : comptes présentés et votés.\n' +
+      '- *Procès-verbaux* signés à chaque réunion.\n' +
+      '- *Registres tenus à jour* : membres, cotisations, crédits.\n' +
+      '- *Transparence* : « pas de pièce, pas d’écriture » ; la caissette ne ' +
+      's’ouvre qu’avec les trois clés.\n' +
+      '- Les autorités locales ne siègent pas au Comité de gestion, afin de ' +
+      'rester arbitres en cas de conflit.',
+  },
+  {
+    title: 'Le cycle de la CEP',
+    content:
+      '*Le cycle de la CEP*\n\n' +
+      '*Début de cycle* : AG de lancement — approbation du rapport de ' +
+      'l’année précédente, élection du Comité de gestion, présentation du ' +
+      'plan d’activités et du budget, adhésions et formation des nouveaux ' +
+      'membres.\n\n' +
+      '*Pendant le cycle* : réunion hebdomadaire obligatoire (épargne, ' +
+      'demandes de prêt, décisions communautaires).\n\n' +
+      '*Fin de cycle* : bilan des activités et bilan financier, distribution ' +
+      'des fonds au prorata des cotisations, fête de clôture, puis ' +
+      'préparation du cycle suivant.',
+  },
+];
