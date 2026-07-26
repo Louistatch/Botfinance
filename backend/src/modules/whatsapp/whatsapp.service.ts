@@ -98,7 +98,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       const { connection, lastDisconnect, qr } = update;
       if (qr) {
         this.currentQrDataUrl = await QRCode.toDataURL(qr);
-        this.logger.log('📲 Nouveau QR Code généré — scannez-le (GET /whatsapp/qr).');
+        this.logger.log('Nouveau QR Code généré — scannez-le (GET /whatsapp/qr).');
         // Affichage terminal facultatif.
         try {
           const qrt = await import('qrcode-terminal');
@@ -110,7 +110,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       if (connection === 'open') {
         this.connectionState = 'connected';
         this.currentQrDataUrl = null;
-        this.logger.log('✅ Bot WhatsApp connecté.');
+        this.logger.log('Bot WhatsApp connecté.');
       }
       if (connection === 'close') {
         this.connectionState = 'disconnected';
@@ -179,11 +179,11 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
         where: { phone },
         data: { state: 'IDLE', data: {}, completed: false },
       });
-      return '❌ Demande annulée. Envoyez *START* pour recommencer.';
+      return 'Demande annulée. Répondez START pour en soumettre une nouvelle.';
     }
 
     if (convo.completed) {
-      return 'Votre demande a déjà été évaluée. Envoyez *START* pour une nouvelle demande.';
+      return 'Votre demande a déjà été analysée. Répondez START pour en soumettre une nouvelle.';
     }
 
     // Détermine la question courante
@@ -204,7 +204,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     // Parse la réponse à la question courante
     const parsed = this.parseAnswer(current, text);
     if (parsed.error) {
-      return `⚠️ ${parsed.error}\n\n${this.render(current)}`;
+      return `${parsed.error}\n\n${this.render(current)}`;
     }
 
     data[current.key] = parsed.value;
@@ -276,9 +276,10 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
 
   private welcome(): string {
     return (
-      '🌾 *CreditCEP AI* — Analyse intelligente de crédit agricole\n' +
-      'Je vais vous poser quelques questions pour évaluer votre demande.\n' +
-      'Tapez *ANNULER* à tout moment.'
+      '*CreditCEP AI* — Analyse de crédit agricole\n\n' +
+      'Bonjour. Je vais recueillir quelques informations sur votre coopérative ' +
+      'afin d’évaluer votre demande de crédit.\n' +
+      'Pour annuler à tout moment, répondez ANNULER.'
     );
   }
 
@@ -357,12 +358,12 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     return this.formatDecision(request.reference, evaluation);
   }
 
-  /** Met en forme la décision pour l'affichage WhatsApp. */
+  /** Met en forme la décision pour l'affichage WhatsApp (ton sobre, professionnel). */
   private formatDecision(reference: string, e: any): string {
     const decisionLabel: Record<Decision, string> = {
-      ELIGIBLE: '✅ *Coopérative ÉLIGIBLE*',
-      CONDITIONAL: '⚠️ *Éligible SOUS CONDITIONS*',
-      REJECTED: '❌ *Non Éligible*',
+      ELIGIBLE: 'Éligible',
+      CONDITIONAL: 'Éligible sous conditions',
+      REJECTED: 'Non éligible',
     };
     const riskLabel: Record<RiskLevel, string> = {
       LOW: 'Faible',
@@ -370,40 +371,43 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       HIGH: 'Élevé',
       VERY_HIGH: 'Très élevé',
     };
+    const score = Number(e.globalScore).toLocaleString('fr-FR', {
+      maximumFractionDigits: 2,
+    });
 
     const lines: string[] = [];
-    lines.push('📊 *RÉSULTAT DE VOTRE DEMANDE*');
+    lines.push('*Résultat de l’analyse*');
+    lines.push('');
     lines.push(`Référence : ${reference}`);
-    lines.push('');
-    lines.push(decisionLabel[e.decision as Decision]);
-    lines.push(`Score global : *${e.globalScore}/100*`);
-    lines.push(`Niveau de risque : *${riskLabel[e.riskLevel as RiskLevel]}*`);
-    lines.push('');
+    lines.push(`Décision : *${decisionLabel[e.decision as Decision]}*`);
+    lines.push(`Score global : ${score} / 100`);
+    lines.push(`Niveau de risque : ${riskLabel[e.riskLevel as RiskLevel]}`);
 
     if (e.decision !== Decision.REJECTED) {
-      lines.push('💰 *Recommandations de financement*');
-      lines.push(`• Montant conseillé : ${Number(e.recommendedAmount).toLocaleString('fr-FR')} FCFA`);
-      lines.push(`• Durée : ${e.recommendedDuration} mois`);
-      if (e.recommendedDeferral) lines.push(`• Différé : ${e.recommendedDeferral} mois`);
-      lines.push(`• Taux conseillé : ${e.recommendedRate}%`);
       lines.push('');
+      lines.push('*Recommandations de financement*');
+      lines.push(`- Montant conseillé : ${Number(e.recommendedAmount).toLocaleString('fr-FR')} FCFA`);
+      lines.push(`- Durée : ${e.recommendedDuration} mois`);
+      if (e.recommendedDeferral) lines.push(`- Différé : ${e.recommendedDeferral} mois`);
+      lines.push(`- Taux conseillé : ${e.recommendedRate} %`);
     }
 
     const conditions = (e.conditions as string[]) ?? [];
     if (e.decision === Decision.CONDITIONAL && conditions.length) {
-      lines.push('📌 *Conditions à remplir*');
-      conditions.slice(0, 5).forEach((c) => lines.push(`• ${c}`));
       lines.push('');
+      lines.push('*Conditions à remplir*');
+      conditions.slice(0, 5).forEach((c) => lines.push(`- ${c}`));
     }
 
     const techs = (e.technicalRecommendations as string[]) ?? [];
     if (techs.length) {
-      lines.push('🌱 *Conseils techniques*');
-      techs.slice(0, 3).forEach((t) => lines.push(`• ${t}`));
       lines.push('');
+      lines.push('*Recommandations techniques*');
+      techs.slice(0, 3).forEach((t) => lines.push(`- ${t}`));
     }
 
-    lines.push('_Envoyez START pour une nouvelle demande._');
+    lines.push('');
+    lines.push('Pour soumettre une nouvelle demande, répondez START.');
     return lines.join('\n');
   }
 }

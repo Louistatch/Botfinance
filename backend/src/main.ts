@@ -63,8 +63,8 @@ async function bootstrap() {
   const port = parseInt(process.env.PORT ?? process.env.BACKEND_PORT ?? '3001', 10);
   await app.listen(port, '0.0.0.0');
 
-  logger.log(`🚀 CreditCEP AI backend prêt sur http://localhost:${port}/${apiPrefix}`);
-  logger.log(`📚 Swagger : http://localhost:${port}/${apiPrefix}/docs`);
+  logger.log(`CreditCEP AI backend prêt sur le port ${port} (préfixe /${apiPrefix}).`);
+  logger.log(`Documentation Swagger disponible sur /${apiPrefix}/docs`);
 }
 
 bootstrap();

@@ -44,7 +44,7 @@ const yesNo: Choice[] = [
  */
 export const CONVERSATION_FLOW: Question[] = [
   // ── Identité de la coopérative ──
-  { key: 'name', prompt: '🌾 *Bienvenue sur CreditCEP AI !*\n\nQuel est le *nom de votre coopérative* ?', type: 'text' },
+  { key: 'name', prompt: 'Quel est le *nom de votre coopérative* ?', type: 'text' },
   { key: 'region', prompt: 'Dans quelle *région* se situe la coopérative ? (ex: Kara)', type: 'text' },
   { key: 'prefecture', prompt: 'Quelle est la *préfecture* ? (ex: ASSOLI, Kozah, Dankpen, Daoudè)', type: 'text' },
   { key: 'village', prompt: 'Quel est le *village* ?', type: 'text' },
