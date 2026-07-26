@@ -164,15 +164,40 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     for (const msg of m.messages) {
       if (!msg.message || msg.key.fromMe) continue;
       const jid = msg.key.remoteJid as string;
-      if (jid.endsWith('@g.us')) continue; // ignore les groupes
-      const text =
-        msg.message.conversation ??
-        msg.message.extendedTextMessage?.text ??
-        '';
+      if (!jid || jid.endsWith('@g.us') || jid.endsWith('@broadcast')) continue;
+
+      const text = this.extractText(msg.message);
       const phone = jid.split('@')[0];
-      const reply = await this.processIncoming(phone, text.trim());
-      await this.sock.sendMessage(jid, { text: reply });
+      this.logger.log(`Message reçu de ${phone}: "${text.slice(0, 40)}"`);
+
+      try {
+        const reply = await this.processIncoming(phone, text.trim());
+        await this.sock.sendMessage(jid, { text: reply });
+        this.logger.log(`Réponse envoyée à ${phone}.`);
+      } catch (err) {
+        this.logger.error(`Échec de réponse à ${phone}`, err as Error);
+      }
     }
+  }
+
+  /** Extrait le texte d'un message WhatsApp, quel que soit son enveloppe. */
+  private extractText(message: any): string {
+    const inner =
+      message?.ephemeralMessage?.message ??
+      message?.viewOnceMessage?.message ??
+      message?.viewOnceMessageV2?.message ??
+      message?.documentWithCaptionMessage?.message ??
+      message;
+    return (
+      inner?.conversation ??
+      inner?.extendedTextMessage?.text ??
+      inner?.imageMessage?.caption ??
+      inner?.videoMessage?.caption ??
+      inner?.buttonsResponseMessage?.selectedButtonId ??
+      inner?.listResponseMessage?.title ??
+      inner?.templateButtonReplyMessage?.selectedId ??
+      ''
+    );
   }
 
   // ───────────────────────── MOTEUR CONVERSATIONNEL ─────────────────────────

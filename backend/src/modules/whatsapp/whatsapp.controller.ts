@@ -9,8 +9,8 @@ import { Public } from '../../common/decorators/public.decorator';
 export class WhatsappController {
   constructor(private readonly whatsapp: WhatsappService) {}
 
+  @Public()
   @Get('status')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'État de la session du bot WhatsApp.' })
   status() {
     return this.whatsapp.getStatus();
