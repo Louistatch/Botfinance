@@ -38,16 +38,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
 
-  if (res.status === 401) {
+  // Un 401 sur une requête AUTHENTIFIÉE = session expirée -> déconnexion.
+  // Un 401 sans jeton (ex. écran de connexion) = identifiants invalides :
+  // on laisse remonter le message réel du serveur.
+  if (res.status === 401 && getToken()) {
     if (typeof window !== 'undefined') logout();
-    throw new Error('Session expirée.');
+    throw new Error('Session expirée. Veuillez vous reconnecter.');
   }
 
-  const json = await res.json();
+  const json = await res.json().catch(() => ({}) as any);
   if (!res.ok || json.success === false) {
     const msg = Array.isArray(json.message)
       ? json.message.join(', ')
-      : json.message ?? 'Erreur';
+      : json.message ?? 'Identifiants invalides ou serveur indisponible.';
     throw new Error(msg);
   }
   return (json.data ?? json) as T;
