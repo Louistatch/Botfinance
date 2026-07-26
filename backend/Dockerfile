@@ -2,6 +2,14 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Outils requis par certaines dépendances :
+#  - git : Baileys tire `libsignal` depuis un dépôt git
+#  - python3/make/g++ : compilation native de libsignal (node-gyp)
+# On force git à utiliser HTTPS au lieu de SSH (pas de clé SSH en conteneur).
+RUN apk add --no-cache git python3 make g++ \
+    && git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" \
+    && git config --global url."https://github.com/".insteadOf "git@github.com:"
+
 # Dépendances (avec devDependencies pour le build)
 COPY package*.json ./
 COPY prisma ./prisma
@@ -18,6 +26,11 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+
+# Mêmes outils : l'install de prod recompile aussi libsignal (dép. de Baileys).
+RUN apk add --no-cache git python3 make g++ \
+    && git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" \
+    && git config --global url."https://github.com/".insteadOf "git@github.com:"
 
 # Dépendances de production uniquement
 COPY package*.json ./
