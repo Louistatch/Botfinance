@@ -121,13 +121,20 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       if (connection === 'close') {
         this.connectionState = 'disconnected';
         const statusCode = lastDisconnect?.error?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        const loggedOut = statusCode === DisconnectReason.loggedOut; // 401
         this.logger.warn(
-          `Connexion fermée (code ${statusCode}). Reconnexion: ${shouldReconnect}`,
+          `Connexion fermée (code ${statusCode}). Session invalidée: ${loggedOut}`,
         );
-        if (shouldReconnect) {
-          setTimeout(() => this.startSocket().catch(() => undefined), 3000);
+        if (loggedOut) {
+          // Session révoquée par WhatsApp (souvent un conflit : deux instances
+          // connectées au même numéro). On efface la session et on régénère un
+          // QR pour permettre un nouvel appairage.
+          this.logger.warn(
+            'Session WhatsApp révoquée — nettoyage et génération d’un nouveau QR.',
+          );
+          await this.clearAuth();
         }
+        setTimeout(() => this.startSocket().catch(() => undefined), 3000);
       }
     });
 
@@ -138,6 +145,18 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
         this.logger.error('Erreur traitement message', err as Error);
       }
     });
+  }
+
+  /** Efface la session Baileys persistée (récupération après un logout 401). */
+  private async clearAuth() {
+    try {
+      const authDir = this.config.get<string>('whatsapp.authDir')!;
+      const fs = await import('fs/promises');
+      await fs.rm(authDir, { recursive: true, force: true });
+      this.currentQrDataUrl = null;
+    } catch (err) {
+      this.logger.error('Échec du nettoyage de la session WhatsApp', err as Error);
+    }
   }
 
   private async handleUpsert(m: any) {
