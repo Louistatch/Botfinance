@@ -172,7 +172,9 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
 
       try {
         const reply = await this.processIncoming(phone, text.trim());
-        await this.sock.sendMessage(jid, { text: reply });
+        // On cite le message reçu : cela fiabilise la livraison, notamment
+        // vers les contacts identifiés par un LID (Baileys 7.x).
+        await this.sock.sendMessage(jid, { text: reply }, { quoted: msg });
         this.logger.log(`Réponse envoyée à ${phone}.`);
       } catch (err) {
         this.logger.error(`Échec de réponse à ${phone}`, err as Error);
