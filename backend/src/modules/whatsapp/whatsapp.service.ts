@@ -10,6 +10,7 @@ import { Decision, RequestSource, RiskLevel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreditRequestsService } from '../credit-requests/credit-requests.service';
 import { CONVERSATION_FLOW, nextQuestion, Question } from './whatsapp.flow';
+import { CREDIT_RULES } from '../scoring/scoring.rules';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -159,65 +160,127 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   async processIncoming(phone: string, text: string): Promise<string> {
     const convo = await this.prisma.whatsappConversation.upsert({
       where: { phone },
-      create: { phone, state: 'START', data: {} },
+      create: { phone, state: 'NEW', data: {} },
       update: { lastMessageAt: new Date() },
     });
 
-    const lower = text.toLowerCase();
+    const lower = text.trim().toLowerCase();
     const data = (convo.data as Record<string, any>) ?? {};
 
-    // Commandes globales
-    if (['start', 'menu', 'bonjour', 'salut', 'recommencer', 'restart'].includes(lower)) {
+    // ── Commandes globales (disponibles partout) ──
+    if (['menu', 'start', 'bonjour', 'salut', 'accueil', 'recommencer', 'restart'].includes(lower)) {
+      await this.setState(phone, 'MENU', {});
+      return this.welcome() + '\n\n' + this.menu();
+    }
+    if (['annuler', 'cancel', 'stop', 'quitter'].includes(lower)) {
+      await this.setState(phone, 'MENU', {});
+      return 'Action annulée.\n\n' + this.menu();
+    }
+
+    // ── Premier contact / après une action : afficher le menu ──
+    if (['NEW', 'DONE', 'IDLE', 'START'].includes(convo.state)) {
+      await this.setState(phone, 'MENU', {});
+      return this.welcome() + '\n\n' + this.menu();
+    }
+
+    // ── L'utilisateur est dans le menu : interpréter son choix ──
+    if (convo.state === 'MENU') {
+      return this.handleMenuChoice(phone, lower);
+    }
+
+    // ── Consultation d'une demande existante ──
+    if (convo.state === 'AWAIT_REFERENCE') {
+      return this.lookupRequest(phone, text.trim());
+    }
+
+    // ── Questionnaire de demande de crédit en cours ──
+    if (convo.state === 'IN_PROGRESS') {
+      const current = nextQuestion(data);
+      if (!current) return this.finalize(phone, data);
+
+      const parsed = this.parseAnswer(current, text);
+      if (parsed.error) {
+        return `${parsed.error}\n\n${this.render(current)}`;
+      }
+      data[current.key] = parsed.value;
       await this.prisma.whatsappConversation.update({
         where: { phone },
-        data: { state: 'IN_PROGRESS', data: {}, completed: false },
+        data: { data },
       });
-      return this.welcome() + '\n\n' + this.render(CONVERSATION_FLOW[0]);
-    }
-    if (['annuler', 'cancel', 'stop'].includes(lower)) {
-      await this.prisma.whatsappConversation.update({
-        where: { phone },
-        data: { state: 'IDLE', data: {}, completed: false },
-      });
-      return 'Demande annulée. Répondez START pour en soumettre une nouvelle.';
+
+      const upcoming = nextQuestion(data);
+      if (!upcoming) return this.finalize(phone, data);
+      return this.render(upcoming);
     }
 
-    if (convo.completed) {
-      return 'Votre demande a déjà été analysée. Répondez START pour en soumettre une nouvelle.';
-    }
+    // ── Repli : retour au menu ──
+    await this.setState(phone, 'MENU', {});
+    return this.menu();
+  }
 
-    // Détermine la question courante
-    const current = nextQuestion(data);
-    if (!current) {
-      return this.finalize(phone, data);
-    }
-
-    // Si on est au tout début et le message n'est pas une commande, on démarre.
-    if (convo.state === 'START' || convo.state === 'IDLE') {
-      await this.prisma.whatsappConversation.update({
-        where: { phone },
-        data: { state: 'IN_PROGRESS' },
-      });
-      return this.welcome() + '\n\n' + this.render(current);
-    }
-
-    // Parse la réponse à la question courante
-    const parsed = this.parseAnswer(current, text);
-    if (parsed.error) {
-      return `${parsed.error}\n\n${this.render(current)}`;
-    }
-
-    data[current.key] = parsed.value;
+  /** Met à jour l'état (et éventuellement les données) d'une conversation. */
+  private async setState(
+    phone: string,
+    state: string,
+    data?: Record<string, any>,
+  ) {
     await this.prisma.whatsappConversation.update({
       where: { phone },
-      data: { data },
+      data: { state, completed: false, ...(data !== undefined ? { data } : {}) },
     });
+  }
 
-    const upcoming = nextQuestion(data);
-    if (!upcoming) {
-      return this.finalize(phone, data);
+  /** Interprète le choix de l'utilisateur dans le menu principal. */
+  private async handleMenuChoice(phone: string, choice: string): Promise<string> {
+    switch (choice) {
+      case '1':
+      case 'demande':
+        await this.setState(phone, 'IN_PROGRESS', {});
+        return (
+          'Nouvelle demande de crédit. Répondez ANNULER pour revenir au menu.\n\n' +
+          this.render(CONVERSATION_FLOW[0])
+        );
+      case '2':
+      case 'consulter':
+        await this.setState(phone, 'AWAIT_REFERENCE', {});
+        return 'Indiquez la référence de votre demande (par exemple DEM-2026-000123).';
+      case '3':
+      case 'conditions':
+        return this.infoCredit() + '\n\n' + this.backHint();
+      case '4':
+      case 'conseiller':
+      case 'contact':
+        return this.contact() + '\n\n' + this.backHint();
+      default:
+        return 'Choix non reconnu. Merci de répondre par un numéro.\n\n' + this.menu();
     }
-    return this.render(upcoming);
+  }
+
+  /** Recherche et restitue le statut d'une demande à partir de sa référence. */
+  private async lookupRequest(phone: string, ref: string): Promise<string> {
+    const request = await this.prisma.creditRequest.findUnique({
+      where: { reference: ref.toUpperCase() },
+      include: { cooperative: true, evaluation: true },
+    });
+    await this.setState(phone, 'MENU');
+
+    if (!request) {
+      return (
+        `Aucune demande trouvée pour la référence « ${ref} ».\n\n` + this.menu()
+      );
+    }
+    if (!request.evaluation) {
+      return (
+        `Demande ${request.reference} — ${request.cooperative.name}\n` +
+        "Statut : en cours d'analyse.\n\n" +
+        this.backHint()
+      );
+    }
+    return (
+      this.formatDecision(request.reference, request.evaluation) +
+      '\n\n' +
+      this.backHint()
+    );
   }
 
   /** Valide et convertit la réponse selon le type de question. */
@@ -276,10 +339,58 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
 
   private welcome(): string {
     return (
-      '*CreditCEP AI* — Analyse de crédit agricole\n\n' +
-      'Bonjour. Je vais recueillir quelques informations sur votre coopérative ' +
-      'afin d’évaluer votre demande de crédit.\n' +
-      'Pour annuler à tout moment, répondez ANNULER.'
+      '*CreditCEP AI*\n' +
+      'Service d’analyse et d’octroi de crédit agricole pour les coopératives ' +
+      '(CEP / ProSMAT).'
+    );
+  }
+
+  /** Menu principal des fonctionnalités. */
+  private menu(): string {
+    return (
+      '*Menu principal*\n\n' +
+      'Répondez avec le numéro de votre choix :\n' +
+      '1. Faire une demande de crédit\n' +
+      '2. Consulter une demande existante\n' +
+      '3. Conditions et plafonds de crédit\n' +
+      '4. Contacter un conseiller\n\n' +
+      'À tout moment, répondez MENU pour revenir ici.'
+    );
+  }
+
+  private backHint(): string {
+    return 'Répondez MENU pour revenir au menu principal.';
+  }
+
+  /** Rappel des conditions de crédit (valeurs officielles CEP / ProSMAT). */
+  private infoCredit(): string {
+    const i = CREDIT_RULES.INTERNAL_FUND;
+    const w = CREDIT_RULES.EXTERNAL_WAGES;
+    return (
+      '*Conditions et plafonds de crédit*\n\n' +
+      '*Fond interne CEP (première année)*\n' +
+      `- Montant maximum : ${i.maxAmount.toLocaleString('fr-FR')} FCFA\n` +
+      `- Plafond : ${i.maxContributionMultiple} fois la cotisation du membre\n` +
+      `- Durée maximale : ${i.maxDurationMonths} mois\n` +
+      `- Taux d’intérêt : ${i.baseRate} %\n\n` +
+      '*Financement externe (WAGES)*\n' +
+      `- Montant maximum : ${w.maxAmount.toLocaleString('fr-FR')} FCFA\n` +
+      `- Taux dégressif : ${w.baseRate} % par an\n` +
+      `- Différé possible : jusqu’à ${w.maxDeferralMonths} mois\n` +
+      `- Caution : ${w.depositRate} %\n\n` +
+      'Le montant accordé ne dépasse pas 2 à 3 fois l’épargne du membre. ' +
+      'L’épargne obligatoire à jour conditionne l’accès au crédit.'
+    );
+  }
+
+  /** Informations de contact / accompagnement. */
+  private contact(): string {
+    return (
+      '*Contacter un conseiller*\n\n' +
+      'Un conseiller de votre Caisse Endogène Paysanne (CEP) peut vous ' +
+      'accompagner dans le montage de votre dossier.\n' +
+      'Rapprochez-vous du bureau de votre coopérative (Présidente ou ' +
+      'Trésorière), ou de votre union régionale ProSMAT.'
     );
   }
 
@@ -344,12 +455,12 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     // 3) Scoring
     const { evaluation } = await this.creditRequests.evaluate(request.id);
 
-    // 4) Persistance de l'état conversationnel
+    // 4) Persistance de l'état conversationnel (retour au menu ensuite)
     await this.prisma.whatsappConversation.update({
       where: { phone },
       data: {
-        completed: true,
-        state: 'DONE',
+        completed: false,
+        state: 'MENU',
         cooperativeId: coop.id,
         lastRequestId: request.id,
       },
@@ -407,7 +518,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     }
 
     lines.push('');
-    lines.push('Pour soumettre une nouvelle demande, répondez START.');
+    lines.push('Répondez MENU pour revenir au menu principal.');
     return lines.join('\n');
   }
 }
