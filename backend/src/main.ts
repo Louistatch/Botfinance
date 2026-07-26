@@ -7,6 +7,19 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Diagnostic de démarrage : variables critiques manquantes ?
+  if (!process.env.DATABASE_URL) {
+    logger.error(
+      "DATABASE_URL est absente ! Reliez un service PostgreSQL et définissez " +
+        "DATABASE_URL=${{Postgres.DATABASE_URL}}. L'API démarre mais la base " +
+        'sera injoignable.',
+    );
+  }
+  if (!process.env.JWT_SECRET) {
+    logger.warn('JWT_SECRET absent — un secret par défaut non sécurisé est utilisé.');
+  }
+
   const app = await NestFactory.create(AppModule, { cors: true });
 
   const apiPrefix = process.env.API_PREFIX ?? 'api';
